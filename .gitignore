@@ -1,0 +1,24 @@
+node_modules
+dist
+src-tauri/target
+src-tauri/gen
+*.log
+.DS_Store
+.env
+.env.local
+
+# Keep app-icon.png source but ignore Tauri-generated icon set if regenerated
+# (leave commented — first commit ships the generated icons so cloners don't
+# need to install image deps)
+# src-tauri/icons/
+
+# Build artifacts
+*.msi
+*.exe
+*.dmg
+*.AppImage
+
+# Editor
+.vscode/
+.idea/
+*.swp

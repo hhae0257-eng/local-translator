@@ -1,0 +1,221 @@
+:root {
+  color-scheme: light dark;
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-2: #1e222b;
+  --border: #2a2f3a;
+  --text: #e7eaf0;
+  --muted: #8b93a3;
+  --accent: #7aa2ff;
+  --accent-2: #9b7aff;
+  --good: #5ad28d;
+  --warn: #ffb84d;
+  --bad: #ff6b6b;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "Segoe UI", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent);
+  letter-spacing: 0.2px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+select, button, textarea {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+select:focus, textarea:focus { border-color: var(--accent); }
+
+button {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover { background: #262b36; }
+
+#refresh-models {
+  padding: 4px 9px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+button.primary {
+  background: linear-gradient(180deg, var(--accent), #5a87e8);
+  border-color: transparent;
+  color: #0a0e16;
+  font-weight: 600;
+}
+button.primary:hover { filter: brightness(1.08); }
+
+.arrow { color: var(--muted); }
+
+.status {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.status.ok { color: var(--good); border-color: rgba(90, 210, 141, 0.3); }
+.status.bad { color: var(--bad); border-color: rgba(255, 107, 107, 0.3); }
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 12px;
+  padding: 12px;
+  height: calc(100% - 53px);
+}
+
+.pane {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pane > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.pane > header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.actions { display: flex; align-items: center; gap: 8px; }
+.actions .copy {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: transparent;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.input-pane {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-pane textarea {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 14px;
+  resize: none;
+  font-size: 15px;
+  line-height: 1.6;
+  border-radius: 0;
+}
+
+.input-pane footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.outputs {
+  display: grid;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 12px;
+  min-height: 0;
+}
+
+.out-pane[data-style="natural"] > header h2 { color: #9bd6ff; }
+.out-pane[data-style="sns"] > header h2 { color: #ffb6e8; }
+.out-pane[data-style="formal"] > header h2 { color: #b8f7c2; }
+
+.output {
+  flex: 1;
+  padding: 14px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 15px;
+  line-height: 1.65;
+  min-height: 0;
+}
+
+.output.loading::after {
+  content: "▍";
+  color: var(--accent);
+  animation: blink 1s infinite;
+  margin-left: 2px;
+}
+
+.output.error {
+  color: var(--bad);
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; grid-template-rows: 1fr 2fr; }
+}
