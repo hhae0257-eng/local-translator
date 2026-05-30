@@ -31,11 +31,13 @@ export async function translate({ model, system, user, signal }) {
     model,
     messages: [
       { role: "system", content: system },
-      { role: "user", content: user },
+      // Prepend /no_think to the user message so Qwen3-style thinking models
+      // skip chain-of-thought and output the translation directly.
+      { role: "user", content: `/no_think\n\n${user}` },
     ],
     temperature: 0.3,
     top_p: 0.9,
-    max_tokens: 1024,
+    max_tokens: 4096,
     stream: false,
   };
 

@@ -17,6 +17,36 @@ const els = {
   outputs: Object.fromEntries(STYLES.map((s) => [s, $(`out-${s}`)])),
 };
 
+// ── CPP (Content Creator Program) 설정 ──
+const cpp = {
+  toggle: $("cpp-toggle"),
+  body:   $("cpp-body"),
+  caret:  $("cpp-caret"),
+  badge:  $("cpp-badge"),
+  tags:   $("cpp-tags"),
+  phrase: $("cpp-phrase"),
+};
+
+function getCppConfig() {
+  const tags   = cpp.tags.value.trim();
+  const phrase = cpp.phrase.value.trim();
+  const pos    = document.querySelector('input[name="cpp-pos"]:checked')?.value ?? "after";
+  return { tags, phrase, pos };
+}
+
+function updateCppBadge() {
+  const { tags, phrase } = getCppConfig();
+  cpp.badge.classList.toggle("hidden", !(tags || phrase));
+}
+
+// 태그를 번역 결과 앞/뒤에 삽입
+function applyCppTags(text, config) {
+  if (!config.tags) return text;
+  return config.pos === "before"
+    ? `${config.tags}\n\n${text}`
+    : `${text}\n\n${config.tags}`;
+}
+
 let currentController = null;
 
 async function refreshModels() {
@@ -104,18 +134,20 @@ async function runTranslation() {
     if (lat) lat.textContent = "";
   }
 
-  setStatus(`번역 중… (병렬 ${STYLES.length}개)`, null);
+  setStatus(`번역 중… (순차 ${STYLES.length}개)`, null);
 
-  // Parallel calls — LM Studio model must be loaded with --parallel >= 3
-  // (e.g. `lms load qwen/qwen3-14b --parallel 3`). Otherwise individual
-  // requests will 500. Sequential fallback is in git history if needed.
-  const tasks = STYLES.map(async (style) => {
+  const cppConfig = getCppConfig();
+
+  // Sequential calls — avoids LM Studio 500 errors when the model cannot
+  // handle concurrent requests. Each style is awaited before the next starts.
+  for (const style of STYLES) {
+    if (signal.aborted) break;
     const start = performance.now();
     const el = els.outputs[style];
     try {
-      const system = buildSystemPrompt(style, source, target);
+      const system = buildSystemPrompt(style, source, target, cppConfig.phrase);
       const out = await translate({ model, system, user: text, signal });
-      el.textContent = stripThinkBlock(out);
+      el.textContent = applyCppTags(stripThinkBlock(out), cppConfig);
       el.classList.remove("loading");
       const ms = Math.round(performance.now() - start);
       const lat = document.querySelector(`.latency[data-key="${style}"]`);
@@ -124,15 +156,13 @@ async function runTranslation() {
       if (e.name === "AbortError") {
         el.classList.remove("loading");
         el.textContent = "(취소됨)";
-        return;
+        break;
       }
       el.textContent = `오류: ${e.message}`;
       el.classList.remove("loading");
       el.classList.add("error");
     }
-  });
-
-  await Promise.allSettled(tasks);
+  }
   setStatus("연결됨 · 완료", "ok");
   els.translateBtn.disabled = false;
 }
@@ -177,6 +207,25 @@ function bindEvents() {
   els.status.addEventListener("click", refreshModels);
   els.status.style.cursor = "pointer";
 
+  // CPP 토글
+  cpp.toggle.addEventListener("click", () => {
+    const open = cpp.body.classList.toggle("open");
+    cpp.caret.classList.toggle("open", open);
+  });
+
+  // CPP 입력 저장
+  cpp.tags.addEventListener("input", () => {
+    updateCppBadge();
+    localStorage.setItem("lt.cpp.tags", cpp.tags.value);
+  });
+  cpp.phrase.addEventListener("input", () => {
+    updateCppBadge();
+    localStorage.setItem("lt.cpp.phrase", cpp.phrase.value);
+  });
+  document.querySelectorAll('input[name="cpp-pos"]').forEach((r) =>
+    r.addEventListener("change", () => localStorage.setItem("lt.cpp.pos", r.value))
+  );
+
   els.input.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
@@ -206,6 +255,18 @@ function restorePrefs() {
   const t = localStorage.getItem("lt.target");
   if (s) els.sourceLang.value = s;
   if (t) els.targetLang.value = t;
+
+  // CPP 설정 복원
+  const savedTags   = localStorage.getItem("lt.cpp.tags");
+  const savedPhrase = localStorage.getItem("lt.cpp.phrase");
+  const savedPos    = localStorage.getItem("lt.cpp.pos");
+  if (savedTags)   cpp.tags.value   = savedTags;
+  if (savedPhrase) cpp.phrase.value = savedPhrase;
+  if (savedPos) {
+    const radio = document.querySelector(`input[name="cpp-pos"][value="${savedPos}"]`);
+    if (radio) radio.checked = true;
+  }
+  updateCppBadge();
 }
 
 restorePrefs();
