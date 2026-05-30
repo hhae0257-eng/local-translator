@@ -44,6 +44,31 @@
       <section class="pane input-pane">
         <header><h2>입력</h2><span id="detected-lang" class="hint"></span></header>
         <textarea id="input" placeholder="번역할 텍스트를 입력하세요. (Ctrl+Enter 로 번역)"></textarea>
+
+        <div class="cpp-panel">
+          <button class="cpp-toggle" id="cpp-toggle" title="CPP 필수 태그·문구 설정">
+            <span class="cpp-icon">📋</span>
+            <span>CPP 설정</span>
+            <span class="cpp-badge hidden" id="cpp-badge">●</span>
+            <span class="cpp-caret" id="cpp-caret">▸</span>
+          </button>
+          <div class="cpp-body" id="cpp-body">
+            <div class="cpp-row">
+              <label for="cpp-tags">필수 태그</label>
+              <input type="text" id="cpp-tags" placeholder="#광고 #협찬 #ad" />
+            </div>
+            <div class="cpp-row">
+              <label for="cpp-phrase">필수 문구</label>
+              <input type="text" id="cpp-phrase" placeholder="본 포스팅은 유료 광고입니다." />
+            </div>
+            <div class="cpp-row cpp-row-inline">
+              <label>태그 위치</label>
+              <label class="radio-label"><input type="radio" name="cpp-pos" value="after" checked> 뒤에 추가</label>
+              <label class="radio-label"><input type="radio" name="cpp-pos" value="before"> 앞에 추가</label>
+            </div>
+          </div>
+        </div>
+
         <footer>
           <span id="char-count" class="hint">0자</span>
           <button id="translate-btn" class="primary">번역 (Ctrl+Enter)</button>

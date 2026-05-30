@@ -45,19 +45,29 @@ export const STYLE_LABEL = {
   formal: "Formal / 격식체",
 };
 
-export function buildSystemPrompt(style, sourceLangCode, targetLangCode) {
+// cppPhrase: optional required disclosure phrase the CPP platform mandates.
+// When provided, the model is instructed to weave it naturally into the output.
+export function buildSystemPrompt(style, sourceLangCode, targetLangCode, cppPhrase = "") {
   const sourceClause =
     sourceLangCode && sourceLangCode !== "auto"
       ? `The source text is in ${langName(sourceLangCode)}. `
       : `Detect the source language automatically. `;
-  return [
+
+  const parts = [
     `You are a professional translator specializing in ${langName(targetLangCode)}.`,
     sourceClause + baseRules(targetLangCode),
     STYLE_INSTRUCTIONS[style](targetLangCode),
-    // Disable reasoning mode for Qwen3 / DeepSeek-R1-style "thinking" models.
-    // These models otherwise consume the token budget on hidden chain-of-thought
-    // and return an empty `content` field. /no_think is the Qwen3 convention;
-    // ignored by other models.
-    "/no_think",
-  ].join("\n\n");
+  ];
+
+  if (cppPhrase) {
+    parts.push(
+      `CPP REQUIREMENT: You MUST include the following mandatory disclosure phrase in your output, ` +
+      `placed where it reads most naturally for the style and target language. ` +
+      `Do NOT omit or paraphrase it — reproduce it exactly:\n"${cppPhrase}"`
+    );
+  }
+
+  // Disable reasoning mode for Qwen3 / DeepSeek-R1-style "thinking" models.
+  parts.push("/no_think");
+  return parts.join("\n\n");
 }
