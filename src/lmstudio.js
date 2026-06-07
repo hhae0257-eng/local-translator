@@ -1,6 +1,16 @@
-const BASE = "http://localhost:1234/v1";
+export const BACKENDS = {
+  lmstudio: { label: "LM Studio", url: "http://localhost:1234/v1" },
+  ollama:   { label: "Ollama",    url: "http://localhost:11434/v1" },
+};
 
+let BASE = BACKENDS.lmstudio.url;
 let cachedFetch = null;
+
+// Call this when the user switches backends.
+export function setBase(url) {
+  BASE = url;
+  cachedFetch = null; // force fetcher re-init for the new origin
+}
 
 async function getFetcher() {
   if (cachedFetch) return cachedFetch;

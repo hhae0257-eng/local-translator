@@ -1,10 +1,11 @@
-import { listModels, translate } from "./lmstudio.js";
+import { listModels, translate, setBase, BACKENDS } from "./lmstudio.js";
 import { buildSystemPrompt, STYLES } from "./prompts.js";
 import { detectLang, LANG_LABEL } from "./detect.js";
 
 const $ = (id) => document.getElementById(id);
 const els = {
   input: $("input"),
+  backendSelect: $("backend-select"),
   modelSelect: $("model-select"),
   refreshBtn: $("refresh-models"),
   sourceLang: $("source-lang"),
@@ -50,6 +51,7 @@ function applyCppTags(text, config) {
 let currentController = null;
 
 async function refreshModels() {
+  const backendLabel = BACKENDS[els.backendSelect.value]?.label ?? "서버";
   setStatus("연결 시도 중…", null);
   try {
     const models = await listModels();
@@ -59,7 +61,7 @@ async function refreshModels() {
       opt.textContent = "(모델이 로드되지 않음)";
       opt.disabled = true;
       els.modelSelect.append(opt);
-      setStatus("LM Studio는 떴지만 로드된 모델 없음", "bad");
+      setStatus(`${backendLabel}: 연결됐지만 로드된 모델 없음`, "bad");
       return;
     }
     for (const m of models) {
@@ -74,7 +76,7 @@ async function refreshModels() {
   } catch (e) {
     const msg = String(e?.message ?? e);
     let hint = "";
-    if (/fetch|Failed|TypeError/i.test(msg)) hint = " (서버 안 켜짐?)";
+    if (/fetch|Failed|TypeError/i.test(msg)) hint = ` (${backendLabel} 안 켜짐?)`;
     else if (/CORS|origin/i.test(msg)) hint = " (CORS)";
     else if (/Forbidden|403|denied/i.test(msg)) hint = " (Tauri 권한)";
     setStatus(`연결 실패${hint} · ⟳ 클릭 재시도`, "bad");
@@ -202,6 +204,17 @@ function bindEvents() {
     localStorage.setItem("lt.target", els.targetLang.value);
   });
 
+  // 백엔드 전환
+  els.backendSelect.addEventListener("change", () => {
+    const key = els.backendSelect.value;
+    const backend = BACKENDS[key];
+    if (backend) {
+      setBase(backend.url);
+      localStorage.setItem("lt.backend", key);
+      refreshModels();
+    }
+  });
+
   els.translateBtn.addEventListener("click", runTranslation);
   els.refreshBtn.addEventListener("click", refreshModels);
   els.status.addEventListener("click", refreshModels);
@@ -251,6 +264,13 @@ function bindEvents() {
 }
 
 function restorePrefs() {
+  // 백엔드 복원 (모델 목록 새로고침 전에 BASE를 설정해야 함)
+  const savedBackend = localStorage.getItem("lt.backend");
+  if (savedBackend && BACKENDS[savedBackend]) {
+    els.backendSelect.value = savedBackend;
+    setBase(BACKENDS[savedBackend].url);
+  }
+
   const s = localStorage.getItem("lt.source");
   const t = localStorage.getItem("lt.target");
   if (s) els.sourceLang.value = s;
