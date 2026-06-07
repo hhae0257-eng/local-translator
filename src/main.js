@@ -2,6 +2,10 @@ import { listModels, translate } from "./lmstudio.js";
 import { buildSystemPrompt, STYLES } from "./prompts.js";
 import { detectLang, LANG_LABEL } from "./detect.js";
 
+// Injected by Vite at build time from package.json
+const APP_VERSION = __APP_VERSION__;
+const GITHUB_REPO = "hhae0257-eng/local-translator";
+
 const $ = (id) => document.getElementById(id);
 const els = {
   input: $("input"),
@@ -264,7 +268,54 @@ function restorePrefs() {
   updateCppBadge();
 }
 
+// ── 버전 표시 ──
+function showVersion() {
+  const el = document.getElementById("app-version");
+  if (el) el.textContent = `v${APP_VERSION}`;
+}
+
+// ── GitHub 최신 릴리즈 확인 ──
+async function checkForUpdates() {
+  try {
+    const res = await window.fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      { headers: { Accept: "application/vnd.github+json" } }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const latest = (data.tag_name ?? "").replace(/^v/, "");
+    if (latest && latest !== APP_VERSION) {
+      showUpdateBanner(latest, data.html_url);
+    }
+  } catch {
+    // 오프라인이거나 GitHub 접속 실패 시 조용히 무시
+  }
+}
+
+function showUpdateBanner(newVer, url) {
+  // 기존 배너가 있으면 제거
+  document.getElementById("update-banner")?.remove();
+
+  const banner = document.createElement("div");
+  banner.id = "update-banner";
+  banner.className = "update-banner";
+  banner.innerHTML =
+    `🎉 새 버전 <strong>v${newVer}</strong> 이 출시됐습니다! ` +
+    `<a href="${url}" target="_blank" rel="noopener">GitHub에서 다운로드</a>` +
+    `<button class="update-dismiss" title="닫기">✕</button>`;
+
+  banner.querySelector(".update-dismiss").addEventListener("click", () =>
+    banner.remove()
+  );
+
+  document.body.prepend(banner);
+}
+
 restorePrefs();
 bindEvents();
 updateCharCount();
+showVersion();
 refreshModels();
+
+// 3초 뒤 업데이트 체크 (앱 로딩 끝난 후)
+setTimeout(checkForUpdates, 3000);

@@ -1,9 +1,15 @@
 import { defineConfig } from "vite";
+import { readFileSync } from "fs";
 
+const pkg = JSON.parse(readFileSync("./package.json", "utf-8"));
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
   clearScreen: false,
+  // Inject package.json version at build time so JS can read it without fs.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   server: {
     port: 1420,
     strictPort: true,
