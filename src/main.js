@@ -1,11 +1,10 @@
-import { listModels, translate, setBase, BACKENDS } from "./lmstudio.js";
+import { listModels, translate } from "./lmstudio.js";
 import { buildSystemPrompt, STYLES } from "./prompts.js";
 import { detectLang, LANG_LABEL } from "./detect.js";
 
 const $ = (id) => document.getElementById(id);
 const els = {
   input: $("input"),
-  backendSelect: $("backend-select"),
   modelSelect: $("model-select"),
   refreshBtn: $("refresh-models"),
   sourceLang: $("source-lang"),
@@ -51,17 +50,16 @@ function applyCppTags(text, config) {
 let currentController = null;
 
 async function refreshModels() {
-  const backendLabel = BACKENDS[els.backendSelect.value]?.label ?? "서버";
   setStatus("연결 시도 중…", null);
   try {
     const models = await listModels();
     els.modelSelect.innerHTML = "";
     if (models.length === 0) {
       const opt = document.createElement("option");
-      opt.textContent = "(모델이 로드되지 않음)";
+      opt.textContent = "(설치된 모델 없음)";
       opt.disabled = true;
       els.modelSelect.append(opt);
-      setStatus(`${backendLabel}: 연결됐지만 로드된 모델 없음`, "bad");
+      setStatus("Ollama 연결됨 · 모델 없음 (ollama pull 필요)", "bad");
       return;
     }
     for (const m of models) {
@@ -75,10 +73,7 @@ async function refreshModels() {
     setStatus(`연결됨 · ${models.length}개 모델`, "ok");
   } catch (e) {
     const msg = String(e?.message ?? e);
-    let hint = "";
-    if (/fetch|Failed|TypeError/i.test(msg)) hint = ` (${backendLabel} 안 켜짐?)`;
-    else if (/CORS|origin/i.test(msg)) hint = " (CORS)";
-    else if (/Forbidden|403|denied/i.test(msg)) hint = " (Tauri 권한)";
+    const hint = /fetch|Failed|TypeError/i.test(msg) ? " (Ollama 안 켜짐?)" : "";
     setStatus(`연결 실패${hint} · ⟳ 클릭 재시도`, "bad");
     console.error("refreshModels failed:", e);
   }
@@ -140,8 +135,7 @@ async function runTranslation() {
 
   const cppConfig = getCppConfig();
 
-  // Sequential calls — avoids LM Studio 500 errors when the model cannot
-  // handle concurrent requests. Each style is awaited before the next starts.
+  // Sequential calls — one at a time to avoid Ollama overload.
   for (const style of STYLES) {
     if (signal.aborted) break;
     const start = performance.now();
@@ -169,8 +163,7 @@ async function runTranslation() {
   els.translateBtn.disabled = false;
 }
 
-// Strip <think>...</think> blocks if a reasoning model emits them in `content`
-// despite /no_think.
+// Strip <think>...</think> blocks if a reasoning model emits them despite /no_think.
 function stripThinkBlock(text) {
   return text.replace(/<think>[\s\S]*?<\/think>\s*/gi, "").trim();
 }
@@ -202,17 +195,6 @@ function bindEvents() {
     els.targetLang.value = s;
     localStorage.setItem("lt.source", els.sourceLang.value);
     localStorage.setItem("lt.target", els.targetLang.value);
-  });
-
-  // 백엔드 전환
-  els.backendSelect.addEventListener("change", () => {
-    const key = els.backendSelect.value;
-    const backend = BACKENDS[key];
-    if (backend) {
-      setBase(backend.url);
-      localStorage.setItem("lt.backend", key);
-      refreshModels();
-    }
   });
 
   els.translateBtn.addEventListener("click", runTranslation);
@@ -264,13 +246,6 @@ function bindEvents() {
 }
 
 function restorePrefs() {
-  // 백엔드 복원 (모델 목록 새로고침 전에 BASE를 설정해야 함)
-  const savedBackend = localStorage.getItem("lt.backend");
-  if (savedBackend && BACKENDS[savedBackend]) {
-    els.backendSelect.value = savedBackend;
-    setBase(BACKENDS[savedBackend].url);
-  }
-
   const s = localStorage.getItem("lt.source");
   const t = localStorage.getItem("lt.target");
   if (s) els.sourceLang.value = s;

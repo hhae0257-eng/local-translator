@@ -1,16 +1,7 @@
-export const BACKENDS = {
-  lmstudio: { label: "LM Studio", url: "http://localhost:1234/v1" },
-  ollama:   { label: "Ollama",    url: "http://localhost:11434/v1" },
-};
+// Ollama OpenAI-compatible API
+const BASE = "http://localhost:11434/v1";
 
-let BASE = BACKENDS.lmstudio.url;
 let cachedFetch = null;
-
-// Call this when the user switches backends.
-export function setBase(url) {
-  BASE = url;
-  cachedFetch = null; // force fetcher re-init for the new origin
-}
 
 async function getFetcher() {
   if (cachedFetch) return cachedFetch;
@@ -27,9 +18,9 @@ async function getFetcher() {
   return cachedFetch;
 }
 
-// Common headers: Origin spoofed to http://localhost so Ollama's CORS
-// middleware accepts the request (Tauri's HTTP plugin otherwise sends
-// Origin: tauri://localhost which Ollama blocks with 403).
+// Spoof Origin to http://localhost so Ollama's CORS middleware accepts the
+// request. Tauri's HTTP plugin otherwise sends Origin: tauri://localhost
+// which Ollama blocks with 403.
 function commonHeaders() {
   return {
     "Content-Type": "application/json",
@@ -37,9 +28,30 @@ function commonHeaders() {
   };
 }
 
-// Label for the currently active backend (used in error messages).
-function backendLabel() {
-  return Object.values(BACKENDS).find((b) => b.url === BASE)?.label ?? "서버";
+// Parse a backend error into a user-friendly Korean message.
+function friendlyError(status, rawText) {
+  let json = null;
+  try { json = JSON.parse(rawText); } catch { /* not JSON */ }
+
+  const apiMsg = json?.error?.message ?? "";
+
+  if (/model.*not found|pull the model/i.test(apiMsg)) {
+    return "모델이 설치되지 않았습니다. 터미널에서 ollama pull [모델명]을 실행해주세요.";
+  }
+  if (/context.*(length|window)|token.*limit/i.test(apiMsg)) {
+    return "입력 텍스트가 너무 깁니다. 내용을 줄여주세요.";
+  }
+  if (status === 403) {
+    return "접근 거부 (403). OLLAMA_ORIGINS 환경변수를 확인해주세요.";
+  }
+  if (status === 404) {
+    return "모델을 찾을 수 없습니다. 터미널에서 ollama pull [모델명]을 실행해주세요.";
+  }
+  if (status === 500) {
+    return "Ollama 서버 오류 (500). ollama 상태를 확인해주세요.";
+  }
+  if (apiMsg) return apiMsg.slice(0, 150);
+  return `오류 ${status} — Ollama에서 요청을 처리할 수 없습니다.`;
 }
 
 export async function listModels() {
@@ -48,7 +60,7 @@ export async function listModels() {
     method: "GET",
     headers: commonHeaders(),
   });
-  if (!r.ok) throw new Error(`${backendLabel()} /models returned ${r.status}`);
+  if (!r.ok) throw new Error(`Ollama /models 오류 (${r.status})`);
   const data = await r.json();
   return (data.data ?? []).map((m) => m.id);
 }
@@ -59,8 +71,8 @@ export async function translate({ model, system, user, signal }) {
     model,
     messages: [
       { role: "system", content: system },
-      // Prepend /no_think to the user message so Qwen3-style thinking models
-      // skip chain-of-thought and output the translation directly.
+      // Prepend /no_think so Qwen3-style thinking models skip chain-of-thought
+      // and output the translation directly.
       { role: "user", content: `/no_think\n\n${user}` },
     ],
     temperature: 0.3,
@@ -78,7 +90,7 @@ export async function translate({ model, system, user, signal }) {
 
   if (!r.ok) {
     const text = await r.text().catch(() => "");
-    throw new Error(`${backendLabel()} ${r.status}: ${text.slice(0, 200)}`);
+    throw new Error(friendlyError(r.status, text));
   }
 
   const data = await r.json();
