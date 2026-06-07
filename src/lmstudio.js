@@ -27,10 +27,28 @@ async function getFetcher() {
   return cachedFetch;
 }
 
+// Common headers: Origin spoofed to http://localhost so Ollama's CORS
+// middleware accepts the request (Tauri's HTTP plugin otherwise sends
+// Origin: tauri://localhost which Ollama blocks with 403).
+function commonHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "Origin": "http://localhost",
+  };
+}
+
+// Label for the currently active backend (used in error messages).
+function backendLabel() {
+  return Object.values(BACKENDS).find((b) => b.url === BASE)?.label ?? "서버";
+}
+
 export async function listModels() {
   const f = await getFetcher();
-  const r = await f(`${BASE}/models`, { method: "GET" });
-  if (!r.ok) throw new Error(`LM Studio /models returned ${r.status}`);
+  const r = await f(`${BASE}/models`, {
+    method: "GET",
+    headers: commonHeaders(),
+  });
+  if (!r.ok) throw new Error(`${backendLabel()} /models returned ${r.status}`);
   const data = await r.json();
   return (data.data ?? []).map((m) => m.id);
 }
@@ -53,14 +71,14 @@ export async function translate({ model, system, user, signal }) {
 
   const r = await f(`${BASE}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: commonHeaders(),
     body: JSON.stringify(body),
     signal,
   });
 
   if (!r.ok) {
     const text = await r.text().catch(() => "");
-    throw new Error(`LM Studio ${r.status}: ${text.slice(0, 200)}`);
+    throw new Error(`${backendLabel()} ${r.status}: ${text.slice(0, 200)}`);
   }
 
   const data = await r.json();
