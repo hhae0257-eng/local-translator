@@ -36,7 +36,6 @@
           </select>
         </label>
         <button id="swap" title="언어 스왑">⇄</button>
-        <button id="history-btn" title="번역 기록">기록</button>
         <span id="status" class="status">연결 확인 중…</span>
       </div>
     </header>
@@ -71,7 +70,10 @@
         </div>
 
         <footer>
-          <span id="char-count" class="hint">0자</span>
+          <div class="footer-left">
+            <span id="char-count" class="hint">0자</span>
+            <button id="history-btn" title="번역 기록 열기">기록</button>
+          </div>
           <button id="translate-btn" class="primary">번역 (Ctrl+Enter)</button>
         </footer>
       </section>

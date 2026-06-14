@@ -356,9 +356,15 @@ button.primary:hover { filter: brightness(1.08); }
 .radio-label input[type="radio"] { margin: 0; accent-color: var(--accent); }
 
 /* ── History Drawer ── */
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 #history-btn {
   font-size: 12px;
-  padding: 4px 10px;
+  padding: 3px 10px;
 }
 #history-btn.active {
   background: var(--accent);
