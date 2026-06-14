@@ -59,6 +59,7 @@ export async function listModels() {
   const r = await f(`${BASE}/models`, {
     method: "GET",
     headers: commonHeaders(),
+    signal: AbortSignal.timeout(8000),
   });
   if (!r.ok) throw new Error(`Ollama /models 오류 (${r.status})`);
   const data = await r.json();

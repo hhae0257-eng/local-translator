@@ -140,30 +140,51 @@ async function runTranslation() {
   const cppConfig = getCppConfig();
 
   // Sequential calls — one at a time to avoid Ollama overload.
+  let errorCount = 0;
+  let aborted = false;
   for (const style of STYLES) {
-    if (signal.aborted) break;
+    if (signal.aborted) { aborted = true; break; }
     const start = performance.now();
     const el = els.outputs[style];
+    const lat = document.querySelector(`.latency[data-key="${style}"]`);
     try {
       const system = buildSystemPrompt(style, source, target, cppConfig.phrase);
       const out = await translate({ model, system, user: text, signal });
       el.textContent = applyCppTags(stripThinkBlock(out), cppConfig);
       el.classList.remove("loading");
-      const ms = Math.round(performance.now() - start);
-      const lat = document.querySelector(`.latency[data-key="${style}"]`);
-      if (lat) lat.textContent = `${(ms / 1000).toFixed(1)}s`;
+      if (lat) lat.textContent = `${((performance.now() - start) / 1000).toFixed(1)}s`;
     } catch (e) {
       if (e.name === "AbortError") {
         el.classList.remove("loading");
         el.textContent = "(취소됨)";
+        aborted = true;
         break;
       }
       el.textContent = `오류: ${e.message}`;
       el.classList.remove("loading");
       el.classList.add("error");
+      errorCount++;
     }
   }
-  setStatus("연결됨 · 완료", "ok");
+
+  // Clean up any panels that never ran because we broke out of the loop.
+  if (aborted) {
+    for (const style of STYLES) {
+      const el = els.outputs[style];
+      if (el.classList.contains("loading")) {
+        el.classList.remove("loading");
+        el.textContent = "(취소됨)";
+      }
+    }
+  }
+
+  if (aborted) {
+    setStatus("번역 취소됨", null);
+  } else if (errorCount > 0) {
+    setStatus(`연결됨 · 완료 (${errorCount}개 오류)`, "bad");
+  } else {
+    setStatus("연결됨 · 완료", "ok");
+  }
   els.translateBtn.disabled = false;
 }
 
@@ -235,8 +256,10 @@ function bindEvents() {
   document.querySelectorAll("button.copy").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const key = btn.dataset.key;
-      const txt = els.outputs[key].textContent;
-      if (!txt) return;
+      const el = els.outputs[key];
+      if (el.classList.contains("error") || el.classList.contains("loading")) return;
+      const txt = el.textContent;
+      if (!txt || txt === "(취소됨)") return;
       try {
         await navigator.clipboard.writeText(txt);
         const orig = btn.textContent;
@@ -293,21 +316,28 @@ async function checkForUpdates() {
 }
 
 function showUpdateBanner(newVer, url) {
-  // 기존 배너가 있으면 제거
   document.getElementById("update-banner")?.remove();
 
   const banner = document.createElement("div");
   banner.id = "update-banner";
   banner.className = "update-banner";
-  banner.innerHTML =
-    `🎉 새 버전 <strong>v${newVer}</strong> 이 출시됐습니다! ` +
-    `<a href="${url}" target="_blank" rel="noopener">GitHub에서 다운로드</a>` +
-    `<button class="update-dismiss" title="닫기">✕</button>`;
 
-  banner.querySelector(".update-dismiss").addEventListener("click", () =>
-    banner.remove()
-  );
+  const msg = document.createElement("span");
+  msg.textContent = `🎉 새 버전 v${newVer} 이 출시됐습니다! `;
 
+  const link = document.createElement("a");
+  link.textContent = "GitHub에서 다운로드";
+  link.setAttribute("href", url);
+  link.setAttribute("target", "_blank");
+  link.setAttribute("rel", "noopener");
+
+  const dismiss = document.createElement("button");
+  dismiss.className = "update-dismiss";
+  dismiss.title = "닫기";
+  dismiss.textContent = "✕";
+  dismiss.addEventListener("click", () => banner.remove());
+
+  banner.append(msg, link, dismiss);
   document.body.prepend(banner);
 }
 
