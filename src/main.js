@@ -1,6 +1,7 @@
 import { listModels, translate } from "./lmstudio.js";
 import { buildSystemPrompt, STYLES } from "./prompts.js";
 import { detectLang, LANG_LABEL } from "./detect.js";
+import { saveEntry, getEntries, removeEntry, clearAll } from "./history.js";
 
 // Injected by Vite at build time from package.json
 const APP_VERSION = __APP_VERSION__;
@@ -20,6 +21,120 @@ const els = {
   translateBtn: $("translate-btn"),
   outputs: Object.fromEntries(STYLES.map((s) => [s, $(`out-${s}`)])),
 };
+
+// ── History drawer ──
+const hist = {
+  btn:      $("history-btn"),
+  drawer:   $("history-drawer"),
+  list:     $("history-list"),
+  search:   $("history-search"),
+  clearBtn: $("history-clear-btn"),
+  closeBtn: $("history-close-btn"),
+};
+
+let _histEntries = [];
+
+function relativeTime(iso) {
+  const m = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (m < 1)  return "방금 전";
+  if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}시간 전`;
+  const d = Math.floor(h / 24);
+  if (d < 8)  return `${d}일 전`;
+  return new Date(iso).toLocaleDateString("ko-KR");
+}
+
+function buildHistItem(entry) {
+  const item = document.createElement("div");
+  item.className = "hist-item";
+
+  const row = document.createElement("div");
+  row.className = "hist-row";
+
+  const time = document.createElement("span");
+  time.className = "hist-time";
+  time.textContent = relativeTime(entry.date);
+
+  const pair = document.createElement("span");
+  pair.className = "hist-pair";
+  pair.textContent = `${LANG_LABEL[entry.source] ?? entry.source} → ${LANG_LABEL[entry.target] ?? entry.target}`;
+
+  const del = document.createElement("button");
+  del.className = "hist-del";
+  del.textContent = "✕";
+  del.title = "삭제";
+  del.addEventListener("click", (e) => {
+    e.stopPropagation();
+    removeEntry(entry.id).then(() => {
+      _histEntries = _histEntries.filter((x) => x.id !== entry.id);
+      item.remove();
+    });
+  });
+
+  row.append(time, pair, del);
+
+  const preview = document.createElement("div");
+  preview.className = "hist-preview";
+  preview.textContent = entry.inputText.length > 80
+    ? entry.inputText.slice(0, 80) + "…"
+    : entry.inputText;
+
+  const model = document.createElement("div");
+  model.className = "hist-model";
+  model.textContent = entry.model;
+
+  item.append(row, preview, model);
+  item.addEventListener("click", () => restoreEntry(entry));
+  return item;
+}
+
+function renderHistList(entries) {
+  hist.list.innerHTML = "";
+  if (entries.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "hist-empty";
+    empty.textContent = "번역 기록이 없습니다.";
+    hist.list.append(empty);
+    return;
+  }
+  for (const e of entries) hist.list.append(buildHistItem(e));
+}
+
+function restoreEntry(entry) {
+  els.input.value = entry.inputText;
+  if (entry.source) els.sourceLang.value = entry.source;
+  if (entry.target) els.targetLang.value = entry.target;
+  for (const style of STYLES) {
+    const el = els.outputs[style];
+    el.classList.remove("loading", "error");
+    el.textContent = entry.outputs?.[style] ?? "";
+  }
+  updateCharCount();
+  updateDetected();
+  closeHistory();
+}
+
+async function openHistory() {
+  hist.drawer.classList.add("open");
+  hist.drawer.setAttribute("aria-hidden", "false");
+  hist.btn.classList.add("active");
+  hist.search.value = "";
+  hist.list.textContent = "로딩 중…";
+  try {
+    _histEntries = await getEntries(200);
+    renderHistList(_histEntries);
+  } catch (e) {
+    hist.list.textContent = "기록을 불러올 수 없습니다.";
+    console.error(e);
+  }
+}
+
+function closeHistory() {
+  hist.drawer.classList.remove("open");
+  hist.drawer.setAttribute("aria-hidden", "true");
+  hist.btn.classList.remove("active");
+}
 
 // ── CPP (Content Creator Program) 설정 ──
 const cpp = {
@@ -186,6 +301,21 @@ async function runTranslation() {
     setStatus("연결됨 · 완료", "ok");
   }
   els.translateBtn.disabled = false;
+
+  // Save to history if at least one output succeeded.
+  if (!aborted) {
+    const validOutputs = {};
+    for (const style of STYLES) {
+      const el = els.outputs[style];
+      if (!el.classList.contains("error") && el.textContent) {
+        validOutputs[style] = el.textContent;
+      }
+    }
+    if (Object.keys(validOutputs).length > 0) {
+      saveEntry({ inputText: text, source, target, model, outputs: validOutputs })
+        .catch(console.error);
+    }
+  }
 }
 
 // Strip <think>...</think> blocks if a reasoning model emits them despite /no_think.
@@ -251,6 +381,27 @@ function bindEvents() {
       e.preventDefault();
       runTranslation();
     }
+  });
+
+  // History
+  hist.btn.addEventListener("click", () =>
+    hist.drawer.classList.contains("open") ? closeHistory() : openHistory()
+  );
+  hist.closeBtn.addEventListener("click", closeHistory);
+  hist.clearBtn.addEventListener("click", async () => {
+    if (!confirm("번역 기록을 전체 삭제할까요?")) return;
+    await clearAll();
+    _histEntries = [];
+    renderHistList([]);
+  });
+  hist.search.addEventListener("input", () => {
+    const q = hist.search.value.toLowerCase();
+    renderHistList(
+      q ? _histEntries.filter((e) =>
+        e.inputText.toLowerCase().includes(q) ||
+        Object.values(e.outputs ?? {}).some((v) => v.toLowerCase().includes(q))
+      ) : _histEntries
+    );
   });
 
   document.querySelectorAll("button.copy").forEach((btn) => {

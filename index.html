@@ -36,6 +36,7 @@
           </select>
         </label>
         <button id="swap" title="언어 스왑">⇄</button>
+        <button id="history-btn" title="번역 기록">기록</button>
         <span id="status" class="status">연결 확인 중…</span>
       </div>
     </header>
@@ -110,6 +111,17 @@
         </article>
       </section>
     </main>
+
+    <!-- History Drawer -->
+    <aside id="history-drawer" class="history-drawer" aria-hidden="true">
+      <div class="hist-header">
+        <span class="hist-title">번역 기록</span>
+        <input type="search" id="history-search" class="hist-search" placeholder="검색…" />
+        <button id="history-clear-btn" class="hist-clear-btn" title="전체 삭제">전체 삭제</button>
+        <button id="history-close-btn" class="hist-close-btn" title="닫기">✕</button>
+      </div>
+      <div id="history-list" class="hist-list"></div>
+    </aside>
 
     <script type="module" src="/src/main.js"></script>
   </body>
