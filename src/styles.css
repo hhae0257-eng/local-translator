@@ -73,15 +73,18 @@ html, body {
   gap: 10px;
 }
 
-.update-banner a {
-  color: var(--good);
+.update-install-btn {
+  background: var(--good);
+  border-color: transparent;
+  color: #071a0f;
   font-weight: 600;
-  text-decoration: underline;
+  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
-
-.update-banner a:hover {
-  color: #7effc0;
-}
+.update-install-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.update-install-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
 .update-dismiss {
   margin-left: auto;

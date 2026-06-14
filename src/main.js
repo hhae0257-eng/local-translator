@@ -448,8 +448,20 @@ function showVersion() {
   if (el) el.textContent = `v${APP_VERSION}`;
 }
 
-// ── GitHub 최신 릴리즈 확인 ──
+// ── 업데이트 확인 (Tauri updater → GitHub API fallback) ──
 async function checkForUpdates() {
+  if (window.__TAURI_INTERNALS__) {
+    // 빌드된 앱 / tauri dev 환경: 플러그인으로 자동 업데이트
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (update?.available) showUpdateBanner(update.version, update);
+    } catch (e) {
+      console.warn("Tauri updater unavailable:", e);
+    }
+    return;
+  }
+  // 브라우저 dev 환경 fallback: GitHub API로 버전만 비교
   try {
     const res = await window.fetch(
       `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
@@ -458,15 +470,11 @@ async function checkForUpdates() {
     if (!res.ok) return;
     const data = await res.json();
     const latest = (data.tag_name ?? "").replace(/^v/, "");
-    if (latest && latest !== APP_VERSION) {
-      showUpdateBanner(latest, data.html_url);
-    }
-  } catch {
-    // 오프라인이거나 GitHub 접속 실패 시 조용히 무시
-  }
+    if (latest && latest !== APP_VERSION) showUpdateBanner(latest, null);
+  } catch { /* 오프라인 시 조용히 무시 */ }
 }
 
-function showUpdateBanner(newVer, url) {
+function showUpdateBanner(newVer, tauriUpdate) {
   document.getElementById("update-banner")?.remove();
 
   const banner = document.createElement("div");
@@ -476,11 +484,33 @@ function showUpdateBanner(newVer, url) {
   const msg = document.createElement("span");
   msg.textContent = `🎉 새 버전 v${newVer} 이 출시됐습니다! `;
 
-  const link = document.createElement("a");
-  link.textContent = "GitHub에서 다운로드";
-  link.setAttribute("href", url);
-  link.setAttribute("target", "_blank");
-  link.setAttribute("rel", "noopener");
+  const btn = document.createElement("button");
+  btn.className = "update-install-btn";
+
+  if (tauriUpdate) {
+    btn.textContent = "지금 업데이트";
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "다운로드 중…";
+      try {
+        await tauriUpdate.downloadAndInstall((evt) => {
+          if (evt.event === "Started")    btn.textContent = "다운로드 중…";
+          if (evt.event === "Finished")   btn.textContent = "설치 중…";
+        });
+        btn.textContent = "완료 · 재시작 중…";
+      } catch (e) {
+        btn.textContent = "오류 — 재시도";
+        btn.disabled = false;
+        console.error("Update install failed:", e);
+      }
+    });
+  } else {
+    // fallback: GitHub 링크 열기
+    btn.textContent = "GitHub에서 다운로드";
+    btn.addEventListener("click", () =>
+      window.open(`https://github.com/${GITHUB_REPO}/releases/latest`, "_blank")
+    );
+  }
 
   const dismiss = document.createElement("button");
   dismiss.className = "update-dismiss";
@@ -488,7 +518,7 @@ function showUpdateBanner(newVer, url) {
   dismiss.textContent = "✕";
   dismiss.addEventListener("click", () => banner.remove());
 
-  banner.append(msg, link, dismiss);
+  banner.append(msg, btn, dismiss);
   document.body.prepend(banner);
 }
 
